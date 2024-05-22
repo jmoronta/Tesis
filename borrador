@@ -1,0 +1,101 @@
+import json
+from pathlib import Path
+
+import folium
+import matplotlib
+import numpy as np
+import pandas as pd
+from exif import Image
+
+def read_exif_data(file_path: Path) -> Image:
+    """Read metadata from photo."""
+    with open(file_path, 'rb') as f:
+        return Image(f)
+
+BASE_LOC = Path("./images")
+file = Path("IMG_1068.DNG")
+
+img = read_exif_data(BASE_LOC / file)
+print('\n'.join([i for i in img.list_all() if i.startswith('gps_')]))
+
+def convert_coords_to_decimal(coords: tuple[float,...], ref: str) -> float:
+    """Covert a tuple of coordinates in the format (degrees, minutes, seconds)
+    and a reference to a decimal representation.
+    Args:
+        coords (tuple[float,...]): A tuple of degrees, minutes and seconds
+        ref (str): Hemisphere reference of "N", "S", "E" or "W".
+    Returns:
+        float: A signed float of decimal representation of the coordinate.
+    """
+    if ref.upper() in ['W', 'S']:
+        mul = -1
+    elif ref.upper() in ['E', 'N']:
+        mul = 1
+    else:
+        print("Incorrect hemisphere reference. "
+              "Expecting one of 'N', 'S', 'E' or 'W', "
+              f'got {ref} instead.')
+        
+    return mul * (coords[0] + coords[1] / 60 + coords[2] / 3600)
+
+def get_decimal_coord_from_exif(exif_data: Image) -> tuple[float, ...]:
+    """Get coordinate data from exif and convert to a tuple of 
+    decimal latitude, longitude and altitude.
+    Args:
+        exif_data (Image): exif Image object
+    Returns:
+        tuple[float, ...]: A tuple of decimal coordinates (lat, lon, alt)
+    """
+    try:
+        lat = convert_coords_to_decimal(
+            exif_data['gps_latitude'], 
+            exif_data['gps_latitude_ref']
+            )
+        lon = convert_coords_to_decimal(
+            exif_data['gps_longitude'], 
+            exif_data['gps_longitude_ref']
+            )
+        alt = exif_data['gps_altitude']
+        return (lat, lon, alt)
+    except (AttributeError, KeyError):
+        print('Image does not contain spatial data or data is invalid.')  
+        raise
+def read_spatial_data_from_folder(folder: Path, image_extension: str = '*.jpg') -> dict[str, dict]:
+    """Create a dictionary of spatial data from photos in a folder.
+    Args:
+        folder (Path): folder as a Path object
+        image_extension (str): extension of images to read. 
+            Defaults to '.jpg'.
+    Returns:
+        dict[str, dict]: A dictionary with filename as the key
+            and a value of a dictionary if the format:
+                {
+                    'coordinates': tuple[float, ...],
+                    'timestamp': str
+                }
+    """
+    coord_dict = dict()
+    source_files = [f for f in folder.rglob(image_extension)]
+    exif = [read_exif_data(f) for f in source_files]
+    
+    for f, data in zip(source_files, exif):
+        try:
+            coord = get_decimal_coord_from_exif(data)
+        except (AttributeError, KeyError):
+            continue
+        else:
+            coord_dict[str(f)] = dict()
+            coord_dict[str(f)]['latitude'] = coord[0]
+            coord_dict[str(f)]['longitude'] = coord[1]
+            coord_dict[str(f)]['altitude'] = coord[2]
+        # Also read date when photo was taken (if available)
+        try:
+            coord_dict[str(f)]['timestamp'] = data.datetime
+        except (AttributeError, KeyError):
+            print(f"Photo {f.name} does not contain datetime information.")
+            coord_dict[str(f)]['timestamp'] = None
+    
+    return coord_dict
+res = read_spatial_data_from_folder(BASE_LOC)
+
+print(json.dumps(res, indent=4))
