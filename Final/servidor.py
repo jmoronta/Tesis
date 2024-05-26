@@ -32,17 +32,23 @@ async def upload(request):
 
 async def show(request):
     
+    import base64
+from datetime import datetime, timedelta
+from aiohttp import web
+
+async def show(request):
+    
     datos = conexion.obtener_datos()
     
-# Obtener la fecha y hora actual
+    # Obtener la fecha y hora actual
     ahora = datetime.now()
     
     # Construir el contenido HTML
     contenido_html = "<html><head><title>Datos de la tabla Patente</title></head><body>"
-    contenido_html += "<style>img { max-width: 200px; max-height: 200px; }</style>"
+    contenido_html += "<style>img { max-width: 200px; max-height: 200px; } .rojo { color: red; }</style>"
     contenido_html += "</head><body>"
     contenido_html += "<h1>Datos de la tabla Patente</h1>"
-    contenido_html += "<table border='1'><tr><th>Fecha y Hora</th><th>Imagen</th><th>Ubicación</th><th>Patente</th><th>Tiempo Transcurrido</th></tr>"
+    contenido_html += "<table border='1'><tr><th>Fecha y Hora</th><th>Imagen</th><th>Ubicación</th><th>Patente</th><th>Tiempo Transcurrido</th><th></th></tr>"
     
     for fila in datos:
         fecha_hora = fila[1]
@@ -52,10 +58,19 @@ async def show(request):
         # Calcular el tiempo transcurrido
         tiempo_transcurrido = ahora - fecha_hora
         
+        # Verificar si el tiempo transcurrido es mayor a una hora
+        if tiempo_transcurrido > timedelta(hours=1):
+            estilo_tiempo_transcurrido = 'rojo'
+            boton_cobrar = "<button>Cobrar</button>"
+        else:
+            estilo_tiempo_transcurrido = ''
+            boton_cobrar = ''
+        
         # Modificación para hacer que la ubicación sea un enlace
-        contenido_html += f"<tr><td>{fecha_hora}</td><td><img src='data:image/jpeg;base64,{imagen_base64}' alt='Imagen'></td><td><a href='{ubicacion}' target='_blank'>{ubicacion}</a></td><td>{fila[4]}</td><td>{tiempo_transcurrido}</td></tr>"
+        contenido_html += f"<tr><td>{fecha_hora}</td><td><img src='data:image/jpeg;base64,{imagen_base64}' alt='Imagen'></td><td><a href='{ubicacion}' target='_blank'>{ubicacion}</a></td><td>{fila[4]}</td><td class='{estilo_tiempo_transcurrido}'>{tiempo_transcurrido}</td><td>{boton_cobrar}</td></tr>"
     
     contenido_html += "</table></body></html>"
+
         
     return web.Response(text=contenido_html, content_type='text/html')
     #return web.Response('mostrar_datos.html', datos=datos)
