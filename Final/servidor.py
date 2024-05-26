@@ -1,3 +1,4 @@
+import base64
 import aiohttp
 from aiohttp import web
 import asyncio
@@ -13,85 +14,53 @@ import bottle
 bottle.BaseRequest.MEMFILE_MAX = 1024 * 1024
 from fast_plate_ocr import ONNXPlateRecognizer
 import conexion as conexion
-from datetime import datetime
+from datetime import datetime,timedelta
+import aiofiles
 
 async def home(request):
-    content= """
-        <html>
-			<head>
-				<title>Directorio WEB</title>
-			</head>
-			<body>
-			<h2>Upload Image</h2> <a href="upload.html" target="_blank" rel="noopener noreferrer">Upload Filter</a>
-			<h2>Apply Resize</h2> <a href="scale.html" target="_blank" rel="noopener noreferrer">Apply Filter</a>
-			<h2>Show converted images</h2> <a href="show.html" target="_blank" rel="noopener noreferrer">Show</a>
-            </body>
-		</html>
-    """
+    
+    async with aiofiles.open('index.html', mode='r') as file:
+        content = await file.read()
+
     return web.Response(text=content, content_type='text/html')
 
 async def upload(request):
-    content= """
-        <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Formulario de Subida de Imágenes</title>
-            </head>
-            <body>
-
-                <h2>Subir Imagen</h2>
-
-                <form action="/upload" method="post" enctype="multipart/form-data">
-                    <label for="image">Selecciona una imagen:</label>
-                    <input type="file" id="image" name="image" accept="image/*" required>
-                    
-                    <br><br>
-
-                    <input type="submit" value="Subir Imagen">
-                </form>
-
-            </body>
-        </html>
-    """
+    async with aiofiles.open('upload.html', mode='r') as file:
+        content = await file.read()
+        
     return web.Response(text=content, content_type='text/html')
 
 async def show(request):
-    grayscale_images_folder = './Grayscale'
-    image_list = list_images(grayscale_images_folder)
-    resized_images_folder='./resized'
-    image_list2 = list_images(resized_images_folder)
-    content = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Imágenes Convertidas</title>
-        </head>
-        <body>
-            <h2>Imágenes Convertidas</h2>
-    """
-    for filename in image_list:
-        content += f'<div>'
-        content += f'<a href="/show_image?filename={filename}" target="_blank">'
-        content += f'<img src="{grayscale_images_folder}/{filename}" alt="{filename}">'
-        content += f'</a>'
-        content += f'</div>'
-    for filename2 in image_list2:
-        content += f'<div>'
-        content += f'<a href="/show_image?filename={filename2}" target="_blank">'
-        content += f'<img src="{resized_images_folder}/{filename2}" alt="{filename2}">'
-        content += f'</a>'
-        content += f'</div>'
+    
+    datos = conexion.obtener_datos()
+    
+# Obtener la fecha y hora actual
+    ahora = datetime.now()
+    
+    # Construir el contenido HTML
+    contenido_html = "<html><head><title>Datos de la tabla Patente</title></head><body>"
+    contenido_html += "<style>img { max-width: 200px; max-height: 200px; }</style>"
+    contenido_html += "</head><body>"
+    contenido_html += "<h1>Datos de la tabla Patente</h1>"
+    contenido_html += "<table border='1'><tr><th>Fecha y Hora</th><th>Imagen</th><th>Ubicación</th><th>Patente</th><th>Tiempo Transcurrido</th></tr>"
+    
+    for fila in datos:
+        fecha_hora = fila[1]
+        imagen_base64 = base64.b64encode(fila[2]).decode('utf-8')
+        ubicacion = fila[3]
         
-    content += """
-        </body>
-        </html>
-    """
+        # Calcular el tiempo transcurrido
+        tiempo_transcurrido = ahora - fecha_hora
+        
+        # Modificación para hacer que la ubicación sea un enlace
+        contenido_html += f"<tr><td>{fecha_hora}</td><td><img src='data:image/jpeg;base64,{imagen_base64}' alt='Imagen'></td><td><a href='{ubicacion}' target='_blank'>{ubicacion}</a></td><td>{fila[4]}</td><td>{tiempo_transcurrido}</td></tr>"
+    
+    contenido_html += "</table></body></html>"
+        
+    return web.Response(text=contenido_html, content_type='text/html')
+    #return web.Response('mostrar_datos.html', datos=datos)
 
-    return web.Response(text=content, content_type='text/html', headers={'Connection': 'close'})
+    #return web.Response(text=content, content_type='text/html', headers={'Connection': 'close'})
 
 
 async def show_image(request):
@@ -102,6 +71,7 @@ async def show_image(request):
         return web.Response(text="Error: Se requiere el parámetro 'filename' en la consulta.", status=400)
 
     # Construir la ruta completa al archivo de imagen
+    
     image_grey_path = os.path.join('./Grayscale', filename)
     image_resize_path = os.path.join('./resized', filename)
     # Verificar si el archivo existe
