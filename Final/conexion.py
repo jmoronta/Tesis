@@ -16,13 +16,16 @@ def insert_en_tabla(imagen,patente,link):
 
     # Obtener los datos de la imagen, la URL y la cadena
     imagen_data = open(imagen, 'rb').read()  
-    url = link  
+    url = link 
+    linkfull=url[0]
+    linklat=url[1]
+    linklon=url[2] 
     cadena = patente  # Reemplaza "Ejemplo de cadena" con tu cadena
     #print("holaaaa:",link)
     
     # Insertar los datos en la tabla
-    consulta = "INSERT INTO patente(fecha_hora,imagen,ubicacion,patente) VALUES (%s, %s, %s, %s)"
-    datos = (fecha_hora_actual, imagen_data, url, cadena)
+    consulta = "INSERT INTO patente(fecha_hora,imagen,ubicacion,patente,latitud,longitud) VALUES (%s, %s, %s, %s, %s, %s)"
+    datos = (fecha_hora_actual, imagen_data, linkfull, cadena,linklat,linklon)
     cursor.execute(consulta, datos)
 
     # Confirmar la operación

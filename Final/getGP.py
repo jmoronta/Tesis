@@ -12,7 +12,7 @@ def create_google_maps_url(gps_coords):
     # We extract the data from the dictionary we sent to this function for longitudinal data.
     dec_deg_lon = convert_decimal_degrees(float(gps_coords["lon"][0]),  float(gps_coords["lon"][1]), float(gps_coords["lon"][2]), gps_coords["lon_ref"])
     # We return a search string which can be used in Google Maps
-    return f"https://maps.google.com/?q={dec_deg_lat},{dec_deg_lon}"
+    return f"https://maps.google.com/?q={dec_deg_lat},{dec_deg_lon}",dec_deg_lat,dec_deg_lon
 
 
 # Converting to decimal degrees for latitude and longitude is from degree/minutes/seconds format is the same for latitude and longitude. So we use DRY principles, and create a seperate function.
