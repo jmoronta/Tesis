@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        img {
+            max-width: 200px;
+            max-height: 200px;
+        }
+        .rojo {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dashboard</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha y Hora</th>
+                <th>Imagen</th>
+                <th>Ubicación</th>
+                <th>Patente</th>
+                <th>Tiempo Transcurrido</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody id="dashboard-data">
+            <!-- Datos se cargarán aquí -->
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('https://localhost:8000/api/dashboard-data')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('dashboard-data');
+                    data.forEach(item => {
+                        const row = document.createElement('tr');
+                        
+                        const fechaHoraCell = document.createElement('td');
+                        fechaHoraCell.textContent = item.fecha_hora;
+                        row.appendChild(fechaHoraCell);
+                        
+                        const imagenCell = document.createElement('td');
+                        const img = document.createElement('img');
+                        img.src = `data:image/jpeg;base64,${item.imagen}`;
+                        imagenCell.appendChild(img);
+                        row.appendChild(imagenCell);
+                        
+                        const ubicacionCell = document.createElement('td');
+                        const a = document.createElement('a');
+                        a.href = item.ubicacion;
+                        a.target = '_blank';
+                        a.textContent = item.ubicacion;
+                        ubicacionCell.appendChild(a);
+                        row.appendChild(ubicacionCell);
+                        
+                        const patenteCell = document.createElement('td');
+                        patenteCell.textContent = item.patente;
+                        row.appendChild(patenteCell);
+                        
+                        const tiempoTranscurridoCell = document.createElement('td');
+                        const tiempoTranscurrido = item.tiempo_transcurrido.split('.')[0]; // Ocultar segundos
+                        tiempoTranscurridoCell.textContent = tiempoTranscurrido;
+                        if (new Date(tiempoTranscurrido) > new Date('01:00:00')) {
+                            tiempoTranscurridoCell.classList.add('rojo');
+                        }
+                        row.appendChild(tiempoTranscurridoCell);
+
+                        const accionCell = document.createElement('td');
+                        const button = document.createElement('button');
+                        button.textContent = 'Cobrar';
+                        button.addEventListener('click', () => {
+                            const patente = item.patente;
+                            const tiempo = Math.ceil(new Date(tiempoTranscurrido).getHours());
+                            const monto = tiempo * 500;
+                            fetch('/cobrar', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    patente: patente,
+                                    tiempo: tiempo,
+                                    monto: monto
+                                })
+                            })
+                            .then(response => response.text())
+                            .then(result => {
+                                alert(result);
+                                // Aquí puedes agregar lógica para actualizar la tabla si es necesario
+                            });
+                        });
+                        accionCell.appendChild(button);
+                        row.appendChild(accionCell);
+                        
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        });
+    </script>
+</body>
+</html>

@@ -24,6 +24,13 @@ async def home(request):
 
     return web.Response(text=content, content_type='text/html')
 
+async def dashboard(request):
+    
+    async with aiofiles.open('dashboard.html', mode='r') as file:
+        content = await file.read()
+
+    return web.Response(text=content, content_type='text/html')
+
 async def upload(request):
     async with aiofiles.open('upload.html', mode='r') as file:
         content = await file.read()
@@ -41,6 +48,7 @@ async def show(request):
     <html>
     <head>
         <title>Datos de la tabla Patente</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
         <style>
             img { max-width: 200px; max-height: 200px; }
             .rojo { color: red; }
@@ -80,7 +88,7 @@ async def show(request):
     </head>
     <body>
         <h1>Datos de la tabla Patente</h1>
-        <table border='1'>
+        <table class='table table-dark' border='1'>
             <tr>
                 <th>Fecha y Hora</th>
                 <th>Imagen</th>
@@ -109,8 +117,7 @@ async def show(request):
         if tiempo_transcurrido > timedelta(hours=1):
             estilo_tiempo_transcurrido = 'rojo'
             boton_cobrar = f"""
-                <form onsubmit="event.preventDefault(); cobrar({horas_redondeadas});">
-                    <input type='hidden' name='tiempo' value='{horas_redondeadas}'>
+                <form onsubmit="event.preventDefault(); cobrar('{fila[4]}', '{fila[1].isoformat()}');">
                     <button type='submit'>Cobrar</button>
                 </form>
             """
@@ -141,13 +148,13 @@ async def show(request):
         </div>
 
         <script>
-            async function cobrar(tiempo) {
+            async function cobrar(patente, tiempo) {
                 const response = await fetch('/cobrar', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: `tiempo=${tiempo}`
+                    body: `patente=${patente}&tiempo=${tiempo}`
                 });
 
                 const result = await response.text();
@@ -175,15 +182,26 @@ async def show(request):
     return web.Response(text=contenido_html, content_type='text/html')
 
 
-    #return web.Response('mostrar_datos.html', datos=datos)
-
-    #return web.Response(text=content, content_type='text/html', headers={'Connection': 'close'})
-
 async def cobrar(request):
     data = await request.post()
-    tiempo = float(data['tiempo'])
-    monto_a_pagar = tiempo * 500
+    patente = data['patente']
+    tiempo_str = data['tiempo']
+    
+    tiempo = datetime.fromisoformat(tiempo_str)
+    ahora = datetime.now()
+    tiempo_transcurrido = ahora - tiempo
+    horas, resto = divmod(tiempo_transcurrido.total_seconds(), 3600)
+    horas_redondeadas = int(horas) + (1 if resto > 0 else 0)
+    
+    monto_a_pagar = horas_redondeadas * 500
+    
+    # Insertar los datos en la tabla cobros
+    conexion.insertar_cobro(patente, tiempo_str, monto_a_pagar)
+    #conexion.insertar_cobro('ABC123', '2023-06-13T12:34:56', 1000.0)
+    
     return web.Response(text=f'El monto a pagar es: ${monto_a_pagar:.2f}', content_type='text/plain')
+
+
 
 
 async def show_image(request):
@@ -271,6 +289,22 @@ async def handle_pagar(request):
     result_path = image_queue.get()
 
     return web.Response(text=f'Imagen "{filename}" cargada con éxito.', content_type='text/plain')
+
+async def get_dashboard_data(request):
+    try:
+        datos = conexion.obtener_datos()  # Implementa esta función en tu módulo de conexión
+        data_list = []
+        for fila in datos:
+            data_list.append({
+                'fecha_hora': fila[1].strftime('%Y-%m-%d %H:%M'),
+                'imagen': base64.b64encode(fila[2]).decode('utf-8'),
+                'ubicacion': fila[3],
+                'patente': fila[4],
+                'tiempo_transcurrido': str(datetime.now() - fila[1])
+            })
+        return web.json_response(data_list)
+    except Exception as e:
+        return web.json_response({'error': str(e)})
 
 def grayscale_worker(queue):
     while True:
@@ -422,6 +456,7 @@ if __name__ == '__main__':
     app.router.add_post('/pagar', handle_pagar)
     app.router.add_post('/cobrar', cobrar)
     app.router.add_get('/show.html', show)
+    app.router.add_get('/api/dashboard-data', get_dashboard_data)
     app.router.add_get('/scale.html', handle_resize)
     app.router.add_post('/resize', resize)
     app.router.add_get('/show_image', show_image)

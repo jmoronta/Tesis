@@ -56,3 +56,59 @@ def obtener_datos():
     finally:
         # Cerrar la conexión
         conexion.close()
+        
+        
+def insertar_cobro(patente, tiempo, monto):
+    try:
+        conexion = pymysql.connect(
+            host="localhost", 
+            user="root",
+            password="password",
+            db="registros_patentes"
+        )
+        with conexion.cursor() as cursor:
+            consulta2 = " INSERT INTO cobros (patente, tiempo, cobrar) VALUES (%s, %s, %s)"
+            datos2 = (patente, tiempo, monto)    
+            cursor.execute(consulta2,datos2 )
+        
+        # Confirmar la operación
+        conexion.commit()
+        cursor.close()
+        
+    except Exception as e:
+        print(f"Error al insertar en la tabla cobros: {e}")
+        
+def dashboard_data():
+    conexion = pymysql.connect(
+            host="localhost", 
+            user="root",
+            password="password",
+            db="registros_patentes"
+        )
+    with conexion.cursor() as cursor:
+    # Obtener datos de la base de datos
+    #cur = mysql.connection.cursor()
+    
+    # Contar la cantidad de patentes
+        cursor.execute("SELECT COUNT(*) FROM patentes")
+    cantidad_patentes = cursor.fetchone()[0]
+
+    # Contar la cantidad de ubicaciones
+    cursor.execute("SELECT COUNT(DISTINCT ubicacion) FROM patentes")
+    cantidad_ubicaciones = cursor.fetchone()[0]
+
+    # Sumar todos los cobros
+    cursor.execute("SELECT SUM(monto) FROM cobros")
+    suma_cobros = cursor.fetchone()[0] or 0  # En caso de que no haya cobros, devolver 0
+
+    cursor.close()
+
+    # Preparar los datos como un objeto JSON
+    data = {
+        'cantidad_patentes': cantidad_patentes,
+        'cantidad_ubicaciones': cantidad_ubicaciones,
+        'suma_cobros': suma_cobros
+    }
+
+    return (data)
+
